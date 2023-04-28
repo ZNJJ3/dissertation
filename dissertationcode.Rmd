@@ -1,0 +1,341 @@
+---
+title: "dissertation"
+author: "RVKP6"
+date: "2023-04-11"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load libraries
+
+library(quanteda)
+library(tidyverse)
+library(dplyr)
+library(data.table)
+library(quanteda.textstats)
+library(texreg)
+library(ggplot2)
+library(MASS)
+library(sjPlot)
+library(flexplot)
+
+# load LIWC dictionary and debates data
+
+load("liwc.Rdata")
+load("debates.Rdata")
+
+# filter for party
+
+debates2 <- debates %>% filter(party == "Labour" | party == "Conservative")
+
+# 1997-2001 
+
+debates_1997_2001 <- debates2 %>% filter(parliamentary_term == "1997-2001")
+debates_corpus <- corpus(debates_1997_2001$body, docvars = debates_1997_2001)
+debates_tokens_punct <- tokens(debates_corpus, remove_punct=TRUE)
+debates_tokens <- tokens_tolower(debates_tokens_punct)
+debates_n_words <- ntoken(debates_corpus)
+debates_dfm <- dfm(debates_tokens)
+Female_Dictionary <- dictionary(list(female =  liwc$Female))  
+dfm_women_dictionary <- dfm_lookup(debates_dfm, Female_Dictionary)
+dfm_women_dictionary_proportions <- dfm_women_dictionary/debates_n_words
+debates_1997_2001$female <-as.numeric(dfm_women_dictionary_proportions[,1]*100)
+debates_1997_mps = debates_1997_2001 %>% group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(female_score=mean(female), .groups = 'drop')
+debates_1997_2001$womenwords <- as.numeric(dfm_women_dictionary[,1])
+debates_1997_2001$n_words <- debates_1997_2001$n_words
+debates_1997_mps2 = debates_1997_2001%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(womenwords=sum(womenwords),(totalwords=sum(n_words)),(totalproportion=womenwords/totalwords), .groups = 'drop')
+debates_1997_mps2$totalwords <- debates_1997_mps2$`(totalwords = sum(n_words))`
+debates_1997_mps2$totalproportion <- (debates_1997_mps2$womenwords/debates_1997_mps2$totalwords)*100
+
+## boxplots
+
+boxplot_1997_gender <- boxplot(debates_1997_mps$female_score[debates_1997_mps$gender=="Female"], debates_1997_mps$female_score[debates_1997_mps$gender=="Male"], main = "1997-2001", xlab = "Gender", ylab="Women Words Score", names=c("Women", "Men"), col=c("pink", "lightblue"), notch=T, outline=F)
+
+boxplot_1997_party <- boxplot(debates_1997_mps$female_score[debates_1997_mps$party=="Labour"], debates_1997_mps$female_score[debates_1997_mps$party=="Conservative"], main = "1997-2001", xlab = "Party", ylab="Women Words Score", names=c("Labour", "Conservative"), col=c("red", "blue"), notch=T, outline=F)
+
+## regression models 
+
+
+gender_1997_2001 <- lm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_1997_mps)
+
+interaction_1997 <- lm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_1997_mps)
+
+robust_lm_1997<-rlm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_1997_mps)
+
+robust_interaction_1997 <- rlm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_1997_mps)
+
+lm_1997_totalproportion <- lm(totalproportion~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_1997_mps2)
+
+lm_1997_totalinteraction <- lm(totalproportion~party*gender+has_degree+margin+entered_house+date_of_birth, data=debates_1997_mps2)
+
+# 2001-2005
+
+debates_2001_2005 <- debates2 %>% filter(parliamentary_term == "2001-2005")
+debates_corpus <- corpus(debates_2001_2005$body, docvars = debates_2001_2005)
+debates_tokens_punct <- tokens(debates_corpus, remove_punct=TRUE)
+debates_tokens <- tokens_tolower(debates_tokens_punct)
+debates_n_words <- ntoken(debates_corpus)
+debates_dfm <- dfm(debates_tokens)
+Female_Dictionary <- dictionary(list(female =  liwc$Female))  
+dfm_women_dictionary <- dfm_lookup(debates_dfm, Female_Dictionary)
+dfm_women_dictionary_proportions <- dfm_women_dictionary/debates_n_words
+debates_2001_2005$female <-as.numeric(dfm_women_dictionary_proportions[,1]*100)
+debates_2001_mps = debates_2001_2005%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(female_score=mean(female), .groups = 'drop')
+debates_2001_2005$womenwords <- as.numeric(dfm_women_dictionary[,1])
+debates_2001_2005$n_words <- debates_2001_2005$n_words
+debates_2001_mps2 = debates_2001_2005%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(womenwords=sum(womenwords),(totalwords=sum(n_words)),(totalproportion=womenwords/totalwords), .groups = 'drop')
+debates_2001_mps2$totalwords <- debates_2001_mps2$`(totalwords = sum(n_words))`
+debates_2001_mps2$totalproportion <- (debates_2001_mps2$womenwords/debates_2001_mps2$totalwords)*100
+
+## boxplots
+
+boxplot_2001_gender <- boxplot(debates_2001_mps$female_score[debates_2001_mps$gender=="Female"], debates_2001_mps$female_score[debates_2001_mps$gender=="Male"], main = "2001-2005", xlab = "Gender", ylab="Women Words Score", names=c("Women", "Men"), col=c("pink", "lightblue"), notch=T, outline=F)
+
+boxplot_2001_party <- boxplot(debates_2001_mps$female_score[debates_2001_mps$party=="Labour"], debates_2001_mps$female_score[debates_2001_mps$party=="Conservative"], main = "2001-2005", xlab = "Party", ylab="Women Words Score", names=c("Labour", "Conservative"), col=c("red", "blue"), notch=T, outline=F)
+
+## regression models
+
+gender_2001_2005 <- lm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2001_mps)
+
+interaction_2001 <- lm(female_score~gender+party+gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2001_mps)
+
+robust_lm_2001<-rlm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2001_mps)
+
+robust_interaction_2001 <- rlm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2001_mps)
+
+lm_2001_totalproportion <- lm(totalproportion~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2001_mps2)
+
+lm_2001_totalinteraction <- lm(totalproportion~party*gender+has_degree+margin+entered_house+date_of_birth, data=debates_2001_mps2)
+
+
+# 2005-2010 
+
+debates_2005_2010 <- debates2 %>% filter(parliamentary_term == "2005-2010")
+debates_corpus <- corpus(debates_2005_2010$body, docvars = debates_2005_2010)
+debates_tokens_punct <- tokens(debates_corpus, remove_punct=TRUE)
+debates_tokens <- tokens_tolower(debates_tokens_punct)
+debates_n_words <- ntoken(debates_corpus)
+debates_dfm <- dfm(debates_tokens)
+Female_Dictionary <- dictionary(list(female =  liwc$Female))  
+dfm_women_dictionary <- dfm_lookup(debates_dfm, Female_Dictionary)
+dfm_women_dictionary_proportions <- dfm_women_dictionary/debates_n_words
+debates_2005_2010$female <-as.numeric(dfm_women_dictionary_proportions[,1]*100)
+debates_2005_mps = debates_2005_2010%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(female_score=mean(female), .groups = 'drop')
+debates_2005_2010$womenwords <- as.numeric(dfm_women_dictionary[,1])
+debates_2005_2010$n_words <- debates_2005_2010$n_words
+debates_2005_mps2 = debates_2005_2010%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(womenwords=sum(womenwords),(totalwords=sum(n_words)),(totalproportion=womenwords/totalwords), .groups = 'drop')
+debates_2005_mps2$totalwords <- debates_2005_mps2$`(totalwords = sum(n_words))`
+debates_2005_mps2$totalproportion <- (debates_2005_mps2$womenwords/debates_2005_mps2$totalwords)*100
+
+## boxplots
+
+boxplot_2005_gender <- boxplot(debates_2005_mps$female_score[debates_2005_mps$gender=="Female"], debates_2005_mps$female_score[debates_2005_mps$gender=="Male"], main = "2005-2010", xlab = "Gender", ylab="Women Words Score", names=c("Women", "Men"), col=c("pink", "lightblue"), notch=T, outline=F)
+
+boxplot_2005_party <- boxplot(debates_2005_mps$female_score[debates_2005_mps$party=="Labour"], debates_2005_mps$female_score[debates_2005_mps$party=="Conservative"], main = "2005-2010", xlab = "Party", ylab="Women Words Score", names=c("Labour", "Conservative"), col=c("red", "blue"), notch=T, outline=F)
+
+## regression models 
+
+gender_2005_2010 <- lm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2005_mps)
+
+interaction_2005 <- lm(female_score~gender+party+gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2005_mps)
+
+robust_lm_2005<-rlm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2005_mps)
+
+robust_interaction_2005 <- rlm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2005_mps)
+
+lm_2005_totalproportion <- lm(totalproportion~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2005_mps2)
+
+lm_2005_totalinteraction <- lm(totalproportion~party*gender+has_degree+margin+entered_house+date_of_birth, data=debates_2005_mps2)
+
+
+# 2010-2015 
+
+debates_2010_2015 <- debates2 %>% filter(parliamentary_term == "2010-2015")
+debates_corpus <- corpus(debates_2010_2015$body, docvars = debates_2010_2015)
+debates_tokens_punct <- tokens(debates_corpus, remove_punct=TRUE)
+debates_tokens <- tokens_tolower(debates_tokens_punct)
+debates_n_words <- ntoken(debates_corpus)
+debates_dfm <- dfm(debates_tokens)
+Female_Dictionary <- dictionary(list(female =  liwc$Female))  
+dfm_women_dictionary <- dfm_lookup(debates_dfm, Female_Dictionary)
+dfm_women_dictionary_proportions <- dfm_women_dictionary/debates_n_words
+debates_2010_2015$female <-as.numeric(dfm_women_dictionary_proportions[,1]*100)
+debates_2010_mps = debates_2010_2015%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(female_score=mean(female), .groups = 'drop')
+debates_2010_2015$womenwords <- as.numeric(dfm_women_dictionary[,1])
+debates_2010_2015$n_words <- debates_2010_2015$n_words
+debates_2010_mps2 = debates_2010_2015%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(womenwords=sum(womenwords),(totalwords=sum(n_words)),(totalproportion=womenwords/totalwords), .groups = 'drop')
+debates_2010_mps2$totalwords <- debates_2010_mps2$`(totalwords = sum(n_words))`
+debates_2010_mps2$totalproportion <- (debates_2010_mps2$womenwords/debates_2010_mps2$totalwords)*100
+
+## boxplots
+
+boxplot_2010_gender <- boxplot(debates_2010_mps$female_score[debates_2010_mps$gender=="Female"], debates_2010_mps$female_score[debates_2010_mps$gender=="Male"], main = "2010-2015", xlab = "Gender", ylab="Women Words Score", names=c("Women", "Men"), col=c("pink", "lightblue"), notch=T, outline=F)
+
+boxplot_2010_party <- boxplot(debates_2010_mps$female_score[debates_2010_mps$party=="Labour"], debates_2010_mps$female_score[debates_2010_mps$party=="Conservative"], main = "2010-2015", xlab = "Party", ylab="Women Words Score", names=c("Labour", "Conservative"), col=c("red", "blue"), notch=T, outline=F)
+
+## regression models
+
+gender_2010_2015 <- lm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2010_mps)
+
+interaction_2010 <- lm(female_score~gender+party+gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2010_mps)
+
+
+robust_lm_2010<-rlm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2010_mps)
+
+robust_interaction_2010 <- rlm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2010_mps)
+
+lm_2010_totalproportion <- lm(totalproportion~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2010_mps2)
+
+lm_2010_totalinteraction <- lm(totalproportion~party*gender+has_degree+margin+entered_house+date_of_birth, data=debates_2010_mps2)
+
+# 2015-2017
+
+debates_2015_2017 <- debates2 %>% filter(parliamentary_term == "2015-2017")
+debates_corpus <- corpus(debates_2015_2017$body, docvars = debates_2015_2017)
+debates_tokens_punct <- tokens(debates_corpus, remove_punct=TRUE)
+debates_tokens <- tokens_tolower(debates_tokens_punct)
+debates_n_words <- ntoken(debates_corpus)
+debates_dfm <- dfm(debates_tokens)
+Female_Dictionary <- dictionary(list(female =  liwc$Female))  
+dfm_women_dictionary <- dfm_lookup(debates_dfm, Female_Dictionary)
+dfm_women_dictionary_proportions <- dfm_women_dictionary/debates_n_words
+debates_2015_2017$female <-as.numeric(dfm_women_dictionary_proportions[,1]*100)
+debates_2015_mps = debates_2015_2017%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(female_score=mean(female), .groups = 'drop')
+debates_2015_2017$womenwords <- as.numeric(dfm_women_dictionary[,1])
+debates_2015_2017$n_words <- debates_2015_2017$n_words
+debates_2015_mps2 = debates_2015_2017%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(womenwords=sum(womenwords),(totalwords=sum(n_words)),(totalproportion=womenwords/totalwords), .groups = 'drop')
+debates_2015_mps2$totalwords <- debates_2015_mps2$`(totalwords = sum(n_words))`
+debates_2015_mps2$totalproportion <- (debates_2015_mps2$womenwords/debates_2015_mps2$totalwords)*100
+
+## boxplots
+
+boxplot_2015_gender <- boxplot(debates_2015_mps$female_score[debates_2015_mps$gender=="Female"], debates_2015_mps$female_score[debates_2015_mps$gender=="Male"], main = "2015-2017", xlab = "Gender", ylab="Women Words Score", names=c("Women", "Men"), col=c("pink", "lightblue"), notch=T, outline=F)
+
+boxplot_2015_party <- boxplot(debates_2015_mps$female_score[debates_2015_mps$party=="Labour"], debates_2015_mps$female_score[debates_2015_mps$party=="Conservative"], main = "2015-2017", xlab = "Party", ylab="Women Words Score", names=c("Labour", "Conservative"), col=c("red", "blue"), notch=T, outline=F)
+
+## regression models 
+
+gender_2015_2017 <- lm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2015_mps)
+
+interaction_2015 <- lm(female_score~gender+party+gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2015_mps)
+
+robust_lm_2015<-rlm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2015_mps)
+
+robust_interaction_2015 <- rlm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2015_mps)
+
+lm_2015_totalproportion <- lm(totalproportion~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2015_mps2)
+
+lm_2015_totalinteraction <- lm(totalproportion~party*gender+has_degree+margin+entered_house+date_of_birth, data=debates_2015_mps2)
+
+# 2017-2019
+
+debates_2017_2019 <- debates2 %>% filter(parliamentary_term == "2017-2019")
+debates_corpus <- corpus(debates_2017_2019$body, docvars = debates_2017_2019)
+debates_tokens_punct <- tokens(debates_corpus, remove_punct=TRUE)
+debates_tokens <- tokens_tolower(debates_tokens_punct)
+debates_n_words <- ntoken(debates_corpus)
+debates_dfm <- dfm(debates_tokens)
+Female_Dictionary <- dictionary(list(female =  liwc$Female))  
+dfm_women_dictionary <- dfm_lookup(debates_dfm, Female_Dictionary)
+dfm_women_dictionary_proportions <- dfm_women_dictionary/debates_n_words
+debates_2017_2019$female <-as.numeric(dfm_women_dictionary_proportions[,1]*100)
+debates_2017_mps = debates_2017_2019%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(female_score=mean(female), .groups = 'drop')
+debates_2017_2019$womenwords <- as.numeric(dfm_women_dictionary[,1])
+debates_2017_2019$n_words <- debates_2017_2019$n_words
+debates_2017_mps2 = debates_2017_2019%>%group_by(member_id, gender, party, has_degree, margin, entered_house, date_of_birth)%>%
+  summarise(womenwords=sum(womenwords),(totalwords=sum(n_words)),(totalproportion=womenwords/totalwords), .groups = 'drop')
+debates_2017_mps2$totalwords <- debates_2017_mps2$`(totalwords = sum(n_words))`
+debates_2017_mps2$totalproportion <- (debates_2017_mps2$womenwords/debates_2017_mps2$totalwords)*100
+
+
+## boxplots
+
+boxplot_2017_gender <- boxplot(debates_2017_mps$female_score[debates_2017_mps$gender=="Female"], debates_2017_mps$female_score[debates_2017_mps$gender=="Male"], main = "2017-2019", xlab = "Gender", ylab="Women Words Score", names=c("Women", "Men"), col=c("pink", "lightblue"), notch=T, outline=F)
+
+boxplot_2017_party <- boxplot(debates_2017_mps$female_score[debates_2017_mps$party=="Labour"], debates_2017_mps$female_score[debates_2017_mps$party=="Conservative"], main = "2017-2019", xlab = "Party", ylab="Women Words Score", names=c("Labour", "Conservative"), col=c("red", "blue"), notch=T, outline=F)
+
+## regression models
+
+gender_2017_2019 <- lm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2017_mps)
+
+interaction_2017 <- lm(female_score~gender+party+gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2017_mps)
+
+robust_lm_2017<-rlm(female_score~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2017_mps)
+
+robust_interaction_2017 <- rlm(female_score~gender+party +gender*party+has_degree+margin+entered_house+date_of_birth, data=debates_2017_mps)
+
+lm_2017_totalproportion <- lm(totalproportion~gender+party+has_degree+margin+entered_house+date_of_birth, data=debates_2017_mps2)
+
+lm_2017_totalinteraction <- lm(totalproportion~party*gender+has_degree+margin+entered_house+date_of_birth, data=debates_2017_mps2)
+
+# Tables
+
+##gender and party table
+
+tab_model(gender_1997_2001, gender_2001_2005, gender_2010_2015, gender_2015_2017, gender_2017_2019, lm_2017_genders, pred.labels=c("Intercept", "Gender (Female)", "Party (Labour)", "Higher Education", "Electoral Margin", "Time in Parliament", "Age"),
+dv.labels =c("1997-2001", "2001-2005", "2005-2010", "2010-2015", "2015-2017", "2017-2019"),p.style="stars", collapse.ci=T)
+
+
+## interaction table
+
+tab_model(lm_1997_interaction, lm_2001_interaction, lm_2005_interaction, lm_2010_interaction, lm_2015_interaction, lm_2017_interaction, pred.labels=c("Intercept", "Gender (Female)","Party (Labour)", "Higher Education", "Electoral Margin", "Time in Parliament", "Age", "Gender*Party"), dv.labels=c("1997-2001", "2001-2005", "2005-2010", "2010-2015", "2015-2017", "2017-2019"),p.style="stars", collapse.ci = T)
+
+##gender and party table using total proportions
+
+tab_model(lm_1997_totalproportion, lm_2001_totalproportion, lm_2005_totalproportion, lm_2010_totalproportion, lm_2015_totalproportion, lm_2017_totalproportion, pred.labels=c("Intercept", "Gender (Female)", "Party (Labour)", "Higher Education", "Electoral Margin", "Time in Parliament", "Age"),
+dv.labels =c("1997-2001", "2001-2005", "2005-2010", "2010-2015", "2015-2017", "2017-2019"),p.style="stars", collapse.ci=T)
+
+
+## interaction table using total proportions
+
+tab_model(lm_1997_totalinteraction, lm_2001_totalinteraction, lm_2005_totalinteraction, lm_2010_totalinteraction, lm_2015_totalinteraction, lm_2017_totalinteraction, pred.labels=c("Intercept", "Gender (Female)", "Party (Labour)", "Higher Education", "Electoral Margin", "Time in Parliament", "Age"),
+dv.labels =c("1997-2001", "2001-2005", "2005-2010", "2010-2015", "2015-2017", "2017-2019"),p.style="stars", collapse.ci=T)
+
+## robust model table
+
+tab_model(robust_interaction_1997, robust_interaction_2001, robust_interaction_2005, robust_interaction_2010, robust_interaction_2015, robust_interaction_2017, pred.labels=c("Intercept", "Gender (Female)","Party (Labour)", "Higher Education", "Electoral Margin", "Time in Parliament", "Age", "Gender*Party"), dv.labels=c("1997-2001", "2001-2005", "2005-2010", "2010-2015", "2015-2017", "2017-2019"),p.style="stars", collapse.ci = T)
+
+## robust interaction model table 
+
+tab_model(robust_lm_1997, robust_lm_2001, robust_lm_2005, robust_lm_2010, robust_lm_2015, robust_lm_2017, pred.labels=c("Intercept", "Gender (Female)", "Party (Labour)", "Higher Education", "Electoral Margin", "Time in Parliament", "Age"),
+dv.labels =c("1997-2001", "2001-2005", "2005-2010", "2010-2015", "2015-2017", "2017-2019"),p.style="stars", collapse.ci=T)
+
+# validity checks
+
+## comparative validity checks 
+
+mean(debates_2001_2005$female[debates_2001_2005$parent=="Sexual Harassment in Parliament"], na.rm=TRUE)
+
+mean(debates_1997_2001$female[debates_2017_2019$parent=="Tributes to Baroness Thatcher"], na.rm=TRUE)
+
+mean(debates_2001_2005$female[debates_2001_2005$parent=="Women, Equality and Human Rights"], na.rm=TRUE)
+
+mean(debates_1997_2001$female[debates_2017_2019$parent=="British Steel"], na.rm=TRUE)
+
+mean(debates_2001_2005$female[debates_2001_2005$parent=="High Speed Rail   Bill: Instruction"], na.rm=TRUE)
+
+mean(debates_1997_2001$female[debates_2017_2019$parent=="Abandoned Vehicles"], na.rm=TRUE)
+
+
+## human coding validity check
+
+validity_check <- debates_1997_2001 %>%
+    arrange(desc(womenwords)) %>%
+    slice(1:30)
+
+```
